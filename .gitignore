@@ -11,3 +11,5 @@ setup_piece2.py
 setup_piece3a.py
 setup_piece3b.py
 setup_piece4.py
+setup_deploy.py
+*.bak
