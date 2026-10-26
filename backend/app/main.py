@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -8,7 +9,8 @@ from app import models  # noqa: F401 - registers the tables on Base
 from app.config import settings
 from app.database import Base, engine
 from app.llm import get_llm
-from app.routers import tickets
+from app.rag import load_knowledge_base
+from app.routers import tickets, voice
 from app.workflow import build_workflow
 
 logging.basicConfig(
@@ -22,6 +24,7 @@ async def lifespan(app: FastAPI):
     # Create DB tables and build the LLM chains once at startup
     Base.metadata.create_all(bind=engine)
     app.state.workflow = build_workflow(get_llm())
+    app.state.knowledge_base = await asyncio.to_thread(load_knowledge_base)
     yield
 
 
@@ -41,3 +44,4 @@ app.add_middleware(
 )
 
 app.include_router(tickets.router)
+app.include_router(voice.router)

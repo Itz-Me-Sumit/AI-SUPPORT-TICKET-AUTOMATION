@@ -6,3 +6,5 @@ sqlalchemy>=2.0
 python-dotenv>=1.0
 langchain-core>=0.3
 langchain-openrouter
+fastembed>=0.4
+numpy>=1.26

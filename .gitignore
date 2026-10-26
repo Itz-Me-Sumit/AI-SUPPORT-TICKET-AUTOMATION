@@ -13,3 +13,4 @@ setup_piece3b.py
 setup_piece4.py
 setup_deploy.py
 *.bak
+backend/data/fastembed_cache/

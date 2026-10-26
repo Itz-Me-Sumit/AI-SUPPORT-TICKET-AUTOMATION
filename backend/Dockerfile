@@ -12,6 +12,7 @@ RUN pip install -r requirements.txt
 
 COPY app ./app
 COPY prompts ./prompts
+COPY knowledge ./knowledge
 
 # Run as a non-root user. The data folder holds the SQLite database.
 RUN useradd --create-home appuser \
