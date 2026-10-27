@@ -1,6 +1,8 @@
 import logging
 import time
 
+from langchain_core.runnables import RunnableLambda
+
 from app.chains import (
     create_resolution_chain,
     create_response_chain,
@@ -21,12 +23,27 @@ CHAIN_LABELS = {
 }
 
 
+def _fail_if_empty(value):
+    """Turn an empty structured output into an error so it can be retried."""
+    if value is None:
+        raise ValueError("The model returned an empty result.")
+    return value
+
+
+def _reliable(chain):
+    """Retry a chain up to 3 times when the model returns nothing usable."""
+    return (chain | RunnableLambda(_fail_if_empty)).with_retry(
+        stop_after_attempt=3,
+        wait_exponential_jitter=False,
+    )
+
+
 def build_workflow(llm) -> dict:
     """Create all chains once and return them in a dictionary."""
     return {
-        "triage_chain": create_triage_chain(llm),
-        "router": create_router(llm),
-        "resolution_chain": create_resolution_chain(llm),
+        "triage_chain": _reliable(create_triage_chain(llm)),
+        "router": _reliable(create_router(llm)),
+        "resolution_chain": _reliable(create_resolution_chain(llm)),
         "response_chain": create_response_chain(llm),
     }
 

@@ -12,5 +12,8 @@ setup_piece3a.py
 setup_piece3b.py
 setup_piece4.py
 setup_deploy.py
+setup_voice_1.py
 *.bak
+backend/data/fastembed_cache/
+**setup**
 backend/data/fastembed_cache/
