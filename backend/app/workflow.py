@@ -126,10 +126,24 @@ async def process_ticket(ticket: dict, workflow: dict) -> dict:
         "resolution",
     )
 
+    resolution_type = resolution.resolution_type
+    recommended_action = resolution.recommended_action
+
     # Critical tickets always need a human, whatever the model says
     requires_human = bool(resolution.requires_human)
     if priority == "critical":
         requires_human = True
+
+    # Policy rule: money decisions are never made by the assistant
+    refund_needed = bool(case_analysis_dict.get("refund_required"))
+    if category in ("billing", "cancellation_refund") and refund_needed:
+        requires_human = True
+        if resolution_type in ("resolve", "self_service"):
+            resolution_type = "escalate"
+            recommended_action = (
+                "Escalate to the billing team: verify the charge and decide on the refund. "
+                "The assistant cannot approve refunds."
+            )
 
     # Stage 4: customer response
     response_text = await workflow["response_chain"].ainvoke(
@@ -140,8 +154,8 @@ async def process_ticket(ticket: dict, workflow: dict) -> dict:
             "priority": priority,
             "language": language,
             "case_analysis": case_analysis_text,
-            "resolution_type": resolution.resolution_type,
-            "recommended_action": resolution.recommended_action,
+            "resolution_type": resolution_type,
+            "recommended_action": recommended_action,
             "requires_human": requires_human,
             "resolution_reason": resolution.reason,
         }
@@ -154,8 +168,8 @@ async def process_ticket(ticket: dict, workflow: dict) -> dict:
         "priority": priority,
         "language": language,
         "case_analysis": case_analysis_dict,
-        "resolution_type": resolution.resolution_type,
-        "recommended_action": resolution.recommended_action,
+        "resolution_type": resolution_type,
+        "recommended_action": recommended_action,
         "requires_human": requires_human,
         "resolution_reason": resolution.reason,
         "response": (response_text or "").strip(),

@@ -31,3 +31,10 @@ Guidelines:
 - request_information: more details are required before acting
 
 Return only the structured resolution decision.
+
+
+Company policy rules (always follow these):
+- Refund approvals, billing disputes and duplicate charges always need a human billing specialist. Choose escalate and set requires_human to true.
+- Suspected unauthorized access and security incidents always need a human. Choose escalate and set requires_human to true.
+- Account deletion and personal data requests always need a human. Choose escalate and set requires_human to true.
+- The assistant never approves refunds and never offers discounts.
