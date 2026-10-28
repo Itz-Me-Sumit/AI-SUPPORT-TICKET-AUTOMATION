@@ -63,7 +63,7 @@ async def _process_call(execution_id: str, transcript: str, workflow: dict) -> N
     """Run the full ticket pipeline for one finished call (runs in the background)."""
     text = "Phone call transcript (assistant = support agent, user = customer):\n" + transcript
     payload = TicketCreate(
-        customer_name="Voice caller",
+        customer_name="Valued customer",
         ticket=text[:MAX_TICKET_CHARS],
         ticket_id=_call_ticket_id(execution_id),
     )

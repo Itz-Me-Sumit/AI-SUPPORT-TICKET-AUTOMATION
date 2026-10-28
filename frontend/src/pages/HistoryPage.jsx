@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 
 import Badge from "../components/Badge";
+import { Phone } from "lucide-react";
+import { isVoiceTicket, ticketPreview } from "../lib/transcript";
 import TicketModal from "../components/TicketModal";
 import { deleteTicket, getStats, listTickets } from "../lib/api";
 import {
@@ -341,9 +343,16 @@ export default function HistoryPage() {
                           className="cursor-pointer border-b border-slate-100 transition hover:bg-slate-50 dark:border-slate-800/60 dark:hover:bg-slate-800/40"
                         >
                           <td className="px-3 py-3">
-                            <p className="font-medium">{ticket.ticket_id}</p>
+                            <p className="flex items-center gap-1.5 font-medium">
+                              {ticket.ticket_id}
+                              {isVoiceTicket(ticket) && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                                  <Phone size={10} /> Voice
+                                </span>
+                              )}
+                            </p>
                             <p className="max-w-[16rem] truncate text-xs text-slate-500 dark:text-slate-400">
-                              {ticket.ticket_text}
+                              {ticketPreview(ticket)}
                             </p>
                           </td>
                           <td className="px-3 py-3">{ticket.customer_name}</td>

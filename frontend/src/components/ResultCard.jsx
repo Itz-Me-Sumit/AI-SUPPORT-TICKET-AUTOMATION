@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, Bot, Check, Clock, Copy, UserCheck } from "lucide-react";
 
 import Badge from "./Badge";
+import { isVoiceTicket, parseTranscript } from "../lib/transcript";
 import {
   CARD_CLASS,
   CATEGORY_STYLES,
@@ -74,6 +75,30 @@ function CopyButton({ text }) {
   );
 }
 
+function TranscriptLines({ text }) {
+  const turns = parseTranscript(text);
+  if (turns.length === 0) return <>{text}</>;
+
+  return (
+    <>
+      {turns.map((turn, index) => (
+        <span key={index} className="block py-1">
+          <span
+            className={`mr-2 text-xs font-semibold uppercase ${
+              turn.speaker === "user"
+                ? "text-indigo-600 dark:text-indigo-400"
+                : "text-slate-500 dark:text-slate-400"
+            }`}
+          >
+            {turn.speaker === "user" ? "Customer" : "Agent"}
+          </span>
+          {turn.text}
+        </span>
+      ))}
+    </>
+  );
+}
+
 export default function ResultCard({ ticket }) {
   const failed = ticket.status === "failed";
 
@@ -98,9 +123,9 @@ export default function ResultCard({ ticket }) {
         )}
       </header>
 
-      <Section title="Original ticket">
+      <Section title={isVoiceTicket(ticket) ? "Call transcript" : "Original ticket"}>
         <p className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-950">
-          {ticket.ticket_text}
+          {isVoiceTicket(ticket) ? <TranscriptLines text={ticket.ticket_text} /> : ticket.ticket_text}
         </p>
       </Section>
 
