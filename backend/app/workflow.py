@@ -34,7 +34,7 @@ def _reliable(chain):
     """Retry a chain up to 3 times when the model returns nothing usable."""
     return (chain | RunnableLambda(_fail_if_empty)).with_retry(
         stop_after_attempt=3,
-        wait_exponential_jitter=False,
+        wait_exponential_jitter=True,
     )
 
 
@@ -44,7 +44,7 @@ def build_workflow(llm) -> dict:
         "triage_chain": _reliable(create_triage_chain(llm)),
         "router": _reliable(create_router(llm)),
         "resolution_chain": _reliable(create_resolution_chain(llm)),
-        "response_chain": create_response_chain(llm),
+        "response_chain": create_response_chain(llm).with_retry(stop_after_attempt=3),
     }
 
 

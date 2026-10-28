@@ -1,8 +1,8 @@
-"""Measure retrieval quality on labeled question sets (no LLM calls).
+"""Compare retrieval modes (vector, hybrid, rerank) on the labeled question sets.
 
-Run from the backend folder:
-    python scripts/eval_retrieval.py baseline
-The label is saved with the result in data/eval_history.txt.
+Run from the backend folder (no LLM calls, so it is free):
+    python scripts/eval_retrieval.py compare
+    python scripts/eval_retrieval.py compare --verbose     (also lists missed questions)
 """
 import sys
 from datetime import datetime
@@ -13,12 +13,10 @@ BACKEND_ROOT = SCRIPT_DIR.parent
 sys.path.insert(0, str(BACKEND_ROOT))
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from app.config import settings  # noqa: E402
-from app.rag import load_knowledge_base  # noqa: E402
+from app.rag import MODES, load_knowledge_base  # noqa: E402
 from eval_sets import EASY, HARD, NEGATIVE_FAR, NEGATIVE_NEAR  # noqa: E402
 
 TOP_K = 3
-THRESHOLD = settings.rag_min_score
 
 
 def is_hit(chunk, expected_file, fragments):
@@ -28,86 +26,98 @@ def is_hit(chunk, expected_file, fragments):
     return any(fragment.lower() in heading for fragment in fragments)
 
 
-def evaluate_positive(kb, name, cases):
-    ranks, top_scores = [], []
-    print(f"\n--- {name} questions ({len(cases)}) ---")
-
+def run_positive(kb, mode, cases, verbose, name):
+    ranks, top_scores, misses = [], [], []
     for question, expected_file, fragments in cases:
-        hits = kb.search(question, TOP_K)
+        hits, used = kb.search_with_mode(question, TOP_K, mode)
+        if used != mode:
+            return None
         rank = next(
             (i + 1 for i, (chunk, _) in enumerate(hits) if is_hit(chunk, expected_file, fragments)),
             None,
         )
         ranks.append(rank)
         top_scores.append(hits[0][1])
-
         if rank != 1:
-            top_chunk, top_score = hits[0]
-            status = f"rank {rank}" if rank else "MISS"
-            print(f"[{status:>7}] {question}")
-            print(f"          top result: {top_chunk.heading} ({top_score:.3f})")
+            misses.append((question, rank, hits[0][0].heading))
 
     total = len(cases)
-    hit1 = sum(1 for r in ranks if r == 1)
-    hit3 = sum(1 for r in ranks if r is not None)
-    mrr = sum(1 / r for r in ranks if r) / total
-    answered = sum(1 for s in top_scores if s >= THRESHOLD)
+    stats = {
+        "hit1": sum(1 for r in ranks if r == 1) / total,
+        "hit3": sum(1 for r in ranks if r is not None) / total,
+        "mrr": sum(1 / r for r in ranks if r) / total,
+        "scores": top_scores,
+    }
+    if verbose and misses:
+        print(f"  [{mode}] {name} questions not at rank 1:")
+        for question, rank, heading in misses:
+            print(f"    rank {rank or 'MISS'}: {question}  (top: {heading})")
+    return stats
 
-    print(f"hit@1 {hit1}/{total} = {hit1 / total:.0%} | hit@3 {hit3}/{total} = {hit3 / total:.0%} "
-          f"| MRR {mrr:.3f} | answered {answered}/{total}")
-    return {"name": name, "total": total, "hit1": hit1, "hit3": hit3, "mrr": mrr,
-            "answered": answered, "scores": top_scores}
 
+def best_gate(positive_scores, negative_scores):
+    """Best answer/reject accuracy over all thresholds, and a threshold that achieves it."""
+    values = sorted(set(positive_scores + negative_scores))
+    thresholds = [values[0] - 1e-6]
+    thresholds += [(a + b) / 2 for a, b in zip(values, values[1:])]
+    thresholds.append(values[-1] + 1e-6)
 
-def evaluate_negative(kb, name, questions):
-    scores = [kb.search(question, 1)[0][1] for question in questions]
-    rejected = sum(1 for s in scores if s < THRESHOLD)
+    total = len(positive_scores) + len(negative_scores)
+    results = []
+    for t in thresholds:
+        correct = sum(1 for s in positive_scores if s >= t)
+        correct += sum(1 for s in negative_scores if s < t)
+        results.append((correct, t))
 
-    print(f"\n--- {name} negative questions ({len(questions)}) ---")
-    for question, score in zip(questions, scores):
-        if score >= THRESHOLD:
-            print(f"[WRONGLY ANSWERED] {score:.3f}  {question}")
-    print(f"rejected {rejected}/{len(questions)}")
-    return {"name": name, "total": len(questions), "rejected": rejected, "scores": scores}
+    best = max(correct for correct, _ in results)
+    ties = [t for correct, t in results if correct == best]
+    return best / total, ties[len(ties) // 2]
 
 
 def main():
-    label = sys.argv[1] if len(sys.argv) > 1 else "run"
+    label = next((a for a in sys.argv[1:] if not a.startswith("--")), "compare")
+    verbose = "--verbose" in sys.argv
+
     kb = load_knowledge_base()
     if kb is None:
-        print("Knowledge base could not be loaded. Is the backend/knowledge folder filled?")
+        print("Knowledge base could not be loaded.")
         sys.exit(1)
 
-    print(f"\nChunks: {len(kb.chunks)} | top_k: {TOP_K} | min score: {THRESHOLD}")
+    negatives = NEGATIVE_FAR + NEGATIVE_NEAR
+    print(f"\nChunks: {len(kb.chunks)} | easy: {len(EASY)} | hard: {len(HARD)} | bad questions: {len(negatives)}\n")
 
-    easy = evaluate_positive(kb, "EASY", EASY)
-    hard = evaluate_positive(kb, "HARD", HARD)
-    far = evaluate_negative(kb, "FAR", NEGATIVE_FAR)
-    near = evaluate_negative(kb, "NEAR", NEGATIVE_NEAR)
+    rows = []
+    for mode in MODES:
+        easy = run_positive(kb, mode, EASY, verbose, "EASY")
+        hard = run_positive(kb, mode, HARD, verbose, "HARD")
+        if easy is None or hard is None:
+            print(f"[{mode}] skipped (the reranker model could not be loaded)")
+            continue
 
-    positive_scores = easy["scores"] + hard["scores"]
-    negative_scores = far["scores"] + near["scores"]
-    gap = min(positive_scores) - max(negative_scores)
-    rejected = far["rejected"] + near["rejected"]
-    negative_total = far["total"] + near["total"]
+        negative_scores = [kb.search_with_mode(q, 1, mode)[0][0][1] for q in negatives]
+        gate_accuracy, threshold = best_gate(easy["scores"] + hard["scores"], negative_scores)
+        rows.append((mode, easy, hard, gate_accuracy, threshold))
 
-    print("\n=== Summary ===")
-    print(f"EASY hit@1 {easy['hit1'] / easy['total']:.0%} | hit@3 {easy['hit3'] / easy['total']:.0%} | MRR {easy['mrr']:.3f}")
-    print(f"HARD hit@1 {hard['hit1'] / hard['total']:.0%} | hit@3 {hard['hit3'] / hard['total']:.0%} | MRR {hard['mrr']:.3f}")
-    print(f"Rejected bad questions: {rejected}/{negative_total}")
-    print(f"Lowest top score on real questions : {min(positive_scores):.3f}")
-    print(f"Highest top score on bad questions : {max(negative_scores):.3f}")
-    print(f"Separation gap (higher is better; negative = overlap): {gap:+.3f}")
+    header = f"{'mode':<8} | {'EASY h@1':>8} {'h@3':>5} {'MRR':>6} | {'HARD h@1':>8} {'h@3':>5} {'MRR':>6} | {'gate acc':>8} | suggested threshold"
+    print("\n" + header)
+    print("-" * len(header))
+    for mode, easy, hard, gate_accuracy, threshold in rows:
+        print(
+            f"{mode:<8} | {easy['hit1']:>8.0%} {easy['hit3']:>5.0%} {easy['mrr']:>6.3f} | "
+            f"{hard['hit1']:>8.0%} {hard['hit3']:>5.0%} {hard['mrr']:>6.3f} | "
+            f"{gate_accuracy:>8.0%} | {threshold:+.3f}"
+        )
 
     history = BACKEND_ROOT / "data" / "eval_history.txt"
     history.parent.mkdir(parents=True, exist_ok=True)
     with history.open("a", encoding="utf-8") as file:
-        file.write(
-            f"{datetime.now():%Y-%m-%d %H:%M} | {label} | "
-            f"easy hit@1={easy['hit1']}/{easy['total']} mrr={easy['mrr']:.3f} | "
-            f"hard hit@1={hard['hit1']}/{hard['total']} hit@3={hard['hit3']}/{hard['total']} mrr={hard['mrr']:.3f} | "
-            f"rejected={rejected}/{negative_total} gap={gap:+.3f}\n"
-        )
+        for mode, easy, hard, gate_accuracy, threshold in rows:
+            file.write(
+                f"{datetime.now():%Y-%m-%d %H:%M} | {label} | {mode} | "
+                f"easy hit@1={easy['hit1']:.0%} mrr={easy['mrr']:.3f} | "
+                f"hard hit@1={hard['hit1']:.0%} hit@3={hard['hit3']:.0%} mrr={hard['mrr']:.3f} | "
+                f"gate={gate_accuracy:.0%} threshold={threshold:+.3f}\n"
+            )
     print(f"\nSaved to {history}")
 
 

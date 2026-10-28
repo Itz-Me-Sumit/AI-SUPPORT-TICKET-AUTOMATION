@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     embedding_cache_dir: str = "./data/fastembed_cache"
     rag_top_k: int = 3
     rag_min_score: float = 0.35
+    rag_mode: str = "vector"  # vector, hybrid or rerank
+    rag_candidates: int = 10
+    rerank_model: str = "Xenova/ms-marco-MiniLM-L-6-v2"
+    rerank_min_score: float = 0.0
+    voice_fallback_model: str = ""
 
     database_url: str = "sqlite:///./data/tickets.db"
     cors_origins: str = "http://localhost:5173,http://localhost:3000"

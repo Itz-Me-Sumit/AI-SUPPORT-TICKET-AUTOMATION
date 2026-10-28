@@ -1,2 +1,8 @@
 2026-10-27 09:49 | baseline | hit@1=24/25 hit@3=25/25 mrr=0.980 answered=25/25 rejected=4/5
 2026-10-27 09:51 | baseline-hard | easy hit@1=24/25 mrr=0.980 | hard hit@1=20/25 hit@3=24/25 mrr=0.873 | rejected=4/13 gap=-0.220
+2026-10-28 06:17 | compare | vector | easy hit@1=96% mrr=0.980 | hard hit@1=80% hit@3=96% mrr=0.873 | gate=87% threshold=+0.614
+2026-10-28 06:17 | compare | hybrid | easy hit@1=92% mrr=0.960 | hard hit@1=72% hit@3=100% mrr=0.853 | gate=86% threshold=+0.614
+2026-10-28 06:17 | compare | rerank | easy hit@1=92% mrr=0.953 | hard hit@1=80% hit@3=96% mrr=0.880 | gate=87% threshold=-10.259
+2026-10-28 16:42 | compare | vector | easy hit@1=96% mrr=0.980 | hard hit@1=80% hit@3=96% mrr=0.873 | gate=87% threshold=+0.614
+2026-10-28 16:42 | compare | hybrid | easy hit@1=92% mrr=0.960 | hard hit@1=72% hit@3=100% mrr=0.853 | gate=86% threshold=+0.614
+2026-10-28 16:42 | compare | rerank | easy hit@1=92% mrr=0.953 | hard hit@1=80% hit@3=96% mrr=0.880 | gate=87% threshold=-10.259
