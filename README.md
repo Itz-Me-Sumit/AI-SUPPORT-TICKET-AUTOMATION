@@ -6,6 +6,8 @@ A customer calls, an AI voice agent answers from the company knowledge base, and
 
 **Live demo:** https://3-107-146-58.sslip.io/ (dashboard with processed tickets)
 
+Some tickets in the demo dashboard were created from simulated call transcripts (see `backend/scripts/seed_demo_calls.py`); the others come from real test calls.
+
 ## What it does
 
 **During the call**
